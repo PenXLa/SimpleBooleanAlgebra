@@ -4,6 +4,11 @@
 #include<sstream>
 #include<stack>
 #include<map>
+#include<functional>
+#include<set>
+
+const int UNKNOWN_OPERATOR = 1;
+const int UNKNOWN_VARIABLE = 2;
 
 struct ele {
     std::string value;
@@ -25,7 +30,7 @@ struct operator_info {
 const operator_info opis[] = { // Ary Pri
                             {"||",2,70}, {"&&",2,90}, {"!",1,100}, {"^",2,80}, {"||",2,70}, 
                             {"(",0,1000}, {")",0,1000}, {"->",2,60}, {"→",2,60}, {"?",2,50},
-                            {"<->",2,50}, {"==",2,50}
+                            {"<->",2,50}, {"==",2,50}, {"+",2,70}, {"*",2,90}
                             };
 
 
@@ -80,6 +85,14 @@ void deleteExpTree(node* nd) {
     delete nd;
 }
 
+node *copyTree(node *nd) {
+    node *r = new node;
+    r->content = nd->content;
+    for (node* cnd : nd->children) 
+        r->children.emplace_back(copyTree(cnd));
+    return r;
+}
+
 void popOper(std::stack<ele> &ostk, std::stack<node*> &nstk) {
     node *nd = new node;
     nd->content = ostk.top();ostk.pop();
@@ -95,7 +108,7 @@ void popOper(std::stack<ele> &ostk, std::stack<node*> &nstk) {
 }
 
 
-const int UNKNOWN_OPERATOR = 1;
+
 node* buildExpTree(const std::string &exp) {
     std::stringstream ss;
     ss << exp;
@@ -147,17 +160,40 @@ void post_out(node* nd) {
     std::cout << nd->content.value;
 }
 
+//逻辑表达式的基础常量
+std::map<std::string, bool> cons = {{"1", true}, {"0", false}, {"true", true}, {"false", false}, {"TRUE", true}, {"FALSE", false}, {"T", true}, {"F", false}};
+inline bool readVar(std::string s, std::map<std::string, bool> &vars) {
+    if (cons.count(s)) return cons[s];
+    else if (vars.count(s)) return vars[s];
+    throw UNKNOWN_VARIABLE;
+}
+//遍历表达式树，将遇到的变量作为key加入到map中
+void getVars(node *nd, std::map<std::string, bool> &vars) {
+    if (nd->content.isVar && !cons.count(nd->content.value)) vars[nd->content.value] = 0;
+    for (node* cnd : nd->children) getVars(cnd, vars);
+}
+//遍历表达式树，将遇到的变量加入set
+void getVars(node *nd, std::set<std::string> &vars) {
+    if (nd->content.isVar && !cons.count(nd->content.value)) vars.emplace(nd->content.value);
+    for (node* cnd : nd->children) getVars(cnd, vars);
+}
+//遍历表达式树，将遇到的变量加入vector
+void getVars(node *nd, std::vector<std::string> &vars) {
+    std::set<std::string> vset;
+    getVars(nd, vset);
+    for (const auto &it:vset) vars.emplace_back(it);
+}
 
 
-bool calc(node *nd, std::map<std::string, bool> vars) {
-    if (nd->content.isVar) return vars[nd->content.value];
+bool calc(node *nd, std::map<std::string, bool> &vars) {
+    if (nd->content.isVar) return readVar(nd->content.value, vars);
     if (nd->content.value=="!") {
         return !calc(nd->children[0], vars);
     } else if (nd->content.value=="^") {
         return calc(nd->children[0], vars)^calc(nd->children[1], vars);
-    } else if (nd->content.value=="&&") {
+    } else if (nd->content.value=="&&" || nd->content.value=="*") {
         return calc(nd->children[0], vars)&&calc(nd->children[1], vars);
-    } else if (nd->content.value=="||") {
+    } else if (nd->content.value=="||" || nd->content.value=="+") {
         return calc(nd->children[0], vars)||calc(nd->children[1], vars);
     } else if (nd->content.value=="->" || nd->content.value=="→") {
         return !calc(nd->children[0], vars)||calc(nd->children[1], vars);
@@ -166,44 +202,118 @@ bool calc(node *nd, std::map<std::string, bool> vars) {
     }
 }
 
-//遍历表达式树，将遇到的变量作为key加入到map中
-void getVars(node *nd, std::map<std::string, bool> &vars) {
-    if (nd->content.isVar) vars[nd->content.value] = 0;
-    for (node* cnd : nd->children) getVars(cnd, vars);
-}
-
-void output_truth_table(std::map<std::string, bool>::iterator it, std::map<std::string, bool> &vars, node *nd) {
+//lambda是出一个结果后的回调函数，bool参数是计算结果，map存储各变量以及取值
+void truth_table(std::map<std::string, bool>::iterator it, std::map<std::string, bool> &vars, node *nd, std::function<void(bool, std::map<std::string, bool>&)> lambda) {
     if (it!=vars.end()) {
         auto it2 = it; ++it2;
         it->second = false;
-        output_truth_table(it2, vars, nd);
+        truth_table(it2, vars, nd, lambda);
         it->second = true;
-        output_truth_table(it2, vars, nd);
+        truth_table(it2, vars, nd, lambda);
     } else {
-        bool res = calc(nd, vars);
-        for (auto it:vars) 
-            std::cout << it.first << "=" << it.second << ' ';
-        std::cout << " result=" << res << '\n';
+        lambda(calc(nd, vars), vars);
     }
+}
+void truth_table(node *nd, std::function<void(bool, std::map<std::string, bool>&)> lambda) {
+    std::map<std::string, bool> vars;
+    getVars(nd, vars);
+    truth_table(vars.begin(), vars, nd, lambda);
 }
 
 void output_truth_table(node* nd) {
-    std::map<std::string, bool> vars;
-    getVars(nd, vars);
-    output_truth_table(vars.begin(), vars, nd);
+    truth_table(nd, [](bool res, std::map<std::string, bool> vars){
+        for (const auto &it:vars) 
+            std::cout << it.first << "=" << it.second << ' ';
+        std::cout << " result=" << res << '\n';
+    });
 }
 
-void expand(node *nd) {
 
+//用于判断b的非0项是否可以覆盖s的非0项
+bool isSub(const std::vector<char> &s, const std::vector<char> &b) {
+    int len = s.size();
+    for (int i=0; i<len; ++i) 
+        if (~s[i] && s[i]!=b[i]) return false;
+    return true;
+}
+
+//判断vector中是否全是某个值
+bool isAllValue(const std::vector<char> &vs, char v) {
+    for (const int it:vs) if (it!=v) return false;
+    return true;
+}
+
+//d是递归深度，seln是应该选择几个, n是总变量数, ndtt是n维真值表
+void simplify_dfs(int d, int seln, std::map<std::vector<char>, bool> &ndtt, std::vector<std::vector<char> > &used, std::vector<char> &sel) {
+    if (d>=0) {
+        sel[d] = -1;
+        simplify_dfs(d-1, seln, ndtt, used, sel);
+        if (seln>0) {
+            sel[d] = 0;
+            simplify_dfs(d-1, seln-1, ndtt, used, sel);
+            sel[d] = 1;
+            simplify_dfs(d-1, seln-1, ndtt, used, sel);
+        }
+    } else if (seln==0) {
+        for (const auto &it:ndtt) 
+            if (isSub(sel, it.first) && !it.second) return;
+        for (const auto &it:used) 
+            if (isSub(it, sel)) return;
+        used.emplace_back(sel);
+    }
+}
+//化简逻辑表达式，原理是列出真值表然后建立n维真值表，逐组合遍历是否可行
+std::string simplify(node *nd) {
+    std::map<std::vector<char>, bool> ndtt;//n维真值表
+    truth_table(nd, [&ndtt](bool res, std::map<std::string, bool> vars){
+        std::vector<char> v;
+        for (const auto &it:vars) v.push_back(it.second);
+        ndtt[v] = res;
+    });
+    std::vector<std::string> vars;
+    getVars(nd, vars);
+
+    std::vector<std::vector<char> > used;
+    std::vector<char> sel(vars.size(), -1);//sel表示对应的变量取值，0表示false, 1表示true, -1表示无关
+    for (int i=0; i<=vars.size(); ++i) 
+        simplify_dfs(vars.size()-1, i, ndtt, used, sel);
+
+    //************************************
+    std::stringstream ss;
+    if(used.empty()) //判断是否没有结果，如果没有结果就是0
+        ss << '0';
+    else {
+        bool firstOr = true;
+        for (const auto &sels : used) {
+            if (isAllValue(sels, -1)) //判断是否是永真式，如果是，应该就只有这一项，会自然退出循环
+                ss << '1';
+            else {
+                int n = sels.size();
+                if (!firstOr) ss << "||"; firstOr = false;
+
+                bool firstAnd = true;
+                for (int i=0; i<n; ++i) {
+                    if (sels[i]!=-1) {
+                        if (!firstAnd) ss << "&&"; firstAnd = false;
+                        if (!sels[i]) ss << "!";
+                        ss << vars[i];
+                    }
+                }
+            }
+        }
+    }
+    
+    return ss.str();
 }
 
 
 int main() {
     try{
-        node* nd = buildExpTree("Q->(P||(P&&Q))");
+        node* nd = buildExpTree("a||!a");
         post_out(nd);
         putchar('\n');
         output_truth_table(nd);
+        std::cout << simplify(nd) << '\n';
         deleteExpTree(nd);
     } catch(...){}
     
