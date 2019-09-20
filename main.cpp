@@ -6,6 +6,8 @@
 #include<map>
 #include<functional>
 #include<set>
+#include<cstring>
+#include"cxxopts.hpp"
 
 const int UNKNOWN_OPERATOR = 1;
 const int UNKNOWN_VARIABLE = 2;
@@ -25,10 +27,11 @@ struct node {
 struct operator_info {
     std::string val;
     int ary, pri;//运算符元数 和 优先级（越大越优先）
+    bool lf=1;//是否是左结合
 };
 
 const operator_info opis[] = { // Ary Pri
-                            {"||",2,70}, {"&&",2,90}, {"!",1,100}, {"^",2,80}, {"||",2,70}, 
+                            {"||",2,70}, {"&&",2,90}, {"!",1,100,false}, {"^",2,80}, {"||",2,70}, 
                             {"(",0,1000}, {")",0,1000}, {"->",2,60}, {"→",2,60}, {"?",2,50},
                             {"<->",2,50}, {"==",2,50}, {"+",2,70}, {"*",2,90}
                             };
@@ -143,7 +146,10 @@ node* buildExpTree(const std::string &exp) {
             while(!ostk.empty() && ostk.top().value!="(") popOper(ostk, nstk);
             if (!ostk.empty()) ostk.pop();
         } else {
-            while(!ostk.empty() && ostk.top().value!="(" && getOpi(ostk.top().value).pri>=getOpi(e.value).pri) 
+            while(!ostk.empty() && ostk.top().value!="(" && 
+                            //下面两个条件的意思是，对于左结合运算符，出栈 优先级>=自己的，对于右结合运算符，出栈 优先级>自己的
+                            (getOpi(ostk.top().value).pri>getOpi(e.value).pri || 
+                            getOpi(e.value).lf&&getOpi(ostk.top().value).pri==getOpi(e.value).pri))
                 popOper(ostk, nstk);
             ostk.push(e);
         }
@@ -262,7 +268,7 @@ void simplify_dfs(int d, int seln, std::map<std::vector<char>, bool> &ndtt, std:
         used.emplace_back(sel);
     }
 }
-//化简逻辑表达式，原理是列出真值表然后建立n维真值表，逐组合遍历是否可行
+//化简逻辑表达式，原理是列出真值表然后建立n维真值表，逐组合遍历是否可行，和卡诺图法类似
 std::string simplify(node *nd) {
     std::map<std::vector<char>, bool> ndtt;//n维真值表
     truth_table(nd, [&ndtt](bool res, std::map<std::string, bool> vars){
@@ -307,14 +313,58 @@ std::string simplify(node *nd) {
 }
 
 
-int main() {
-    try{
-        node* nd = buildExpTree("a||!a");
-        post_out(nd);
-        putchar('\n');
-        output_truth_table(nd);
-        std::cout << simplify(nd) << '\n';
-        deleteExpTree(nd);
-    } catch(...){}
+bool checkOption(std::string opt, cxxopts::ParseResult &res) {
+    if (res.count(opt)) return true;
+    else {
+        std::cout << "missing option " << opt;
+        exit(-1);
+    }
+}
+
+
+
+int main(int argc, char* argv[]) {
+    cxxopts::Options options("Simple Boolean Algebra", "A simple boolean algebra system");
+    options.add_options()
+    ("g,get", "tell me what you want", cxxopts::value<std::string>())
+    ("e,exp", "input the expression", cxxopts::value<std::string>());
+
+    try {
+        auto res = options.parse(argc,argv);
+        checkOption("get", res);
+        std::string oper = res["get"].as<std::string>();
+        if (oper == "simplify" || oper == "s") {
+            checkOption("exp", res);
+            std::string exp = res["exp"].as<std::string>();
+
+            try {
+                node *nd = buildExpTree(exp);
+                std::cout << simplify(nd);
+                deleteExpTree(nd);
+                return 0;
+            } catch(...) {
+                exit(-1);
+            }
+        } else if (oper == "postexp") {
+            checkOption("exp", res);
+            std::string exp = res["exp"].as<std::string>();
+
+            try {
+                node *nd = buildExpTree(exp);
+                post_out(nd);
+                deleteExpTree(nd);
+                return 0;
+            } catch(...) {
+                exit(-1);
+            }
+        }
+
+    } catch (cxxopts::OptionParseException e) {
+        std::cout << "unknown option";
+        exit(-1);
+    }
+    
+    
+
     
 }
