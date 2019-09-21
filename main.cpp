@@ -24,24 +24,24 @@ struct node {
     node *parent=nullptr;
 };
 
-//ÓÃÓÚ½âÎöÖĞ×º±í´ïÊ½Ê±Ìá¹©ÔËËã·ûµÄĞÅÏ¢
-//ÓĞÁËÕâ¸ö£¬¾Í×ã¹»ÈÃ±í´ïÊ½Ê÷ÕıÈ·½¨Á¢
+//ç”¨äºè§£æä¸­ç¼€è¡¨è¾¾å¼æ—¶æä¾›è¿ç®—ç¬¦çš„ä¿¡æ¯
+//æœ‰äº†è¿™ä¸ªï¼Œå°±è¶³å¤Ÿè®©è¡¨è¾¾å¼æ ‘æ­£ç¡®å»ºç«‹
 struct operator_info {
     std::string val;
-    int ary, pri;//ÔËËã·ûÔªÊı ºÍ ÓÅÏÈ¼¶£¨Ô½´óÔ½ÓÅÏÈ£©
-    bool lf=1;//ÊÇ·ñÊÇ×ó½áºÏ
-    const std::string mj="";//mathjaxÀïÒ»Ğ©ÔËËã·ûĞèÒª×ªÒå·ûºÅ
+    int ary, pri;//è¿ç®—ç¬¦å…ƒæ•° å’Œ ä¼˜å…ˆçº§ï¼ˆè¶Šå¤§è¶Šä¼˜å…ˆï¼‰
+    bool lf=1;//æ˜¯å¦æ˜¯å·¦ç»“åˆ
+    const std::string mj="";//mathjaxé‡Œä¸€äº›è¿ç®—ç¬¦éœ€è¦è½¬ä¹‰ç¬¦å·
 };
 
 const operator_info opis[] = { // Ary Pri
                             {"||",2,70}, {"&&",2,90,true,"\\&\\&"}, {"!",1,100,false}, {"^",2,80}, {"||",2,70}, 
-                            {"(",0,1000}, {")",0,1000}, {"->",2,60}, {"¡ú",2,60}, {"?",2,50},
+                            {"(",0,1000}, {")",0,1000}, {"->",2,60}, {"â†’",2,60}, {"â‡„",2,50},
                             {"<->",2,50}, {"==",2,50}, {"+",2,70}, {"*",2,90}
                             };
 
 
 
-//Èç¹ûÃ»ÓĞÕÒµ½£¬throwÔËËã·ûÇ°×ºÓësÏàµÈµÄ¸öÊı
+//å¦‚æœæ²¡æœ‰æ‰¾åˆ°ï¼Œthrowè¿ç®—ç¬¦å‰ç¼€ä¸sç›¸ç­‰çš„ä¸ªæ•°
 operator_info getOpi(std::string s) {
     int n = sizeof(opis)/sizeof(operator_info);
     int presame = 0, slen = s.length();
@@ -52,7 +52,7 @@ operator_info getOpi(std::string s) {
     throw presame;
 }
 
-//Èç¹ûÊ¶±ğ³ö´í£¬throwÁĞºÅ
+//å¦‚æœè¯†åˆ«å‡ºé”™ï¼Œthrowåˆ—å·
 std::stringstream& operator >> (std::stringstream& in, ele& x) {
     if (in.peek()==-1) return in;
     x.isVar = isalnum(in.peek());
@@ -62,10 +62,10 @@ std::stringstream& operator >> (std::stringstream& in, ele& x) {
         while(c=in.peek(), ~c&&isalnum(c))
             x.value.push_back(in.get());
     } else {
-        while(~(c = in.peek()) && c==' ') in.get();//³ÔµôÇ°Ãæ¿Õ¸ñ
+        while(~(c = in.peek()) && c==' ') in.get();//åƒæ‰å‰é¢ç©ºæ ¼
         std::string tmp = "";
         bool isok = false;
-        int cnt = 0;//±íÊ¾¶ÁÈ¡µÄ¶àÓà×Ö·ûÊı£¬Ö®ºóÒªunget»ØÈ¥
+        int cnt = 0;//è¡¨ç¤ºè¯»å–çš„å¤šä½™å­—ç¬¦æ•°ï¼Œä¹‹åè¦ungetå›å»
         while(~(c = in.get()) && c!=' ') {
             tmp.push_back(c);++cnt;
             try{
@@ -125,7 +125,7 @@ node* buildExpTree(const std::string &exp) {
     std::stack<ele> ostk;
     std::stack<node*> nstk;
     while(1) {
-        //*******¡ıÏÂÒ»¸ö±äÁ¿»òÔËËã·û*****
+        //*******â†“ä¸‹ä¸€ä¸ªå˜é‡æˆ–è¿ç®—ç¬¦*****
         try{
             if (!(ss>>e)) break;
         } catch(int col) {
@@ -147,8 +147,8 @@ node* buildExpTree(const std::string &exp) {
             }
             throw UNKNOWN_OPERATOR;
         }
-        //********¡ü»ñÈ¡ÏÂÒ»¸ö±äÁ¿»òÔËËã·û**********
-        //********¡ıÕ»²Ù×÷*******************
+        //********â†‘è·å–ä¸‹ä¸€ä¸ªå˜é‡æˆ–è¿ç®—ç¬¦**********
+        //********â†“æ ˆæ“ä½œ*******************
         try {
             if (e.isVar) nstk.push(new node{e});
             else if (e.value==")") {
@@ -156,7 +156,7 @@ node* buildExpTree(const std::string &exp) {
                 if (!ostk.empty()) ostk.pop();
             } else {
                 while(!ostk.empty() && ostk.top().value!="(" && 
-                                //ÏÂÃæÁ½¸öÌõ¼şµÄÒâË¼ÊÇ£¬¶ÔÓÚ×ó½áºÏÔËËã·û£¬³öÕ» ÓÅÏÈ¼¶>=×Ô¼ºµÄ£¬¶ÔÓÚÓÒ½áºÏÔËËã·û£¬³öÕ» ÓÅÏÈ¼¶>×Ô¼ºµÄ
+                                //ä¸‹é¢ä¸¤ä¸ªæ¡ä»¶çš„æ„æ€æ˜¯ï¼Œå¯¹äºå·¦ç»“åˆè¿ç®—ç¬¦ï¼Œå‡ºæ ˆ ä¼˜å…ˆçº§>=è‡ªå·±çš„ï¼Œå¯¹äºå³ç»“åˆè¿ç®—ç¬¦ï¼Œå‡ºæ ˆ ä¼˜å…ˆçº§>è‡ªå·±çš„
                                 (getOpi(ostk.top().value).pri>getOpi(e.value).pri || 
                                 getOpi(e.value).lf&&getOpi(ostk.top().value).pri==getOpi(e.value).pri))
                     popOper(ostk, nstk);
@@ -173,7 +173,7 @@ node* buildExpTree(const std::string &exp) {
         
     }
     while(!ostk.empty()) popOper(ostk, nstk);
-    //********¡üÕ»²Ù×÷*******************
+    //********â†‘æ ˆæ“ä½œ*******************
     return nstk.top();
 }
 
@@ -185,24 +185,24 @@ void post_out(node* nd) {
     std::cout << nd->content.value;
 }
 
-//Âß¼­±í´ïÊ½µÄ»ù´¡³£Á¿
+//é€»è¾‘è¡¨è¾¾å¼çš„åŸºç¡€å¸¸é‡
 std::map<std::string, bool> cons = {{"1", true}, {"0", false}, {"true", true}, {"false", false}, {"TRUE", true}, {"FALSE", false}, {"T", true}, {"F", false}};
 inline bool readVar(std::string s, std::map<std::string, bool> &vars) {
     if (cons.count(s)) return cons[s];
     else if (vars.count(s)) return vars[s];
     throw UNKNOWN_VARIABLE;
 }
-//±éÀú±í´ïÊ½Ê÷£¬½«Óöµ½µÄ±äÁ¿×÷Îªkey¼ÓÈëµ½mapÖĞ
+//éå†è¡¨è¾¾å¼æ ‘ï¼Œå°†é‡åˆ°çš„å˜é‡ä½œä¸ºkeyåŠ å…¥åˆ°mapä¸­
 void getVars(node *nd, std::map<std::string, bool> &vars) {
     if (nd->content.isVar && !cons.count(nd->content.value)) vars[nd->content.value] = 0;
     for (node* cnd : nd->children) getVars(cnd, vars);
 }
-//±éÀú±í´ïÊ½Ê÷£¬½«Óöµ½µÄ±äÁ¿¼ÓÈëset
+//éå†è¡¨è¾¾å¼æ ‘ï¼Œå°†é‡åˆ°çš„å˜é‡åŠ å…¥set
 void getVars(node *nd, std::set<std::string> &vars) {
     if (nd->content.isVar && !cons.count(nd->content.value)) vars.emplace(nd->content.value);
     for (node* cnd : nd->children) getVars(cnd, vars);
 }
-//±éÀú±í´ïÊ½Ê÷£¬½«Óöµ½µÄ±äÁ¿¼ÓÈëvector
+//éå†è¡¨è¾¾å¼æ ‘ï¼Œå°†é‡åˆ°çš„å˜é‡åŠ å…¥vector
 void getVars(node *nd, std::vector<std::string> &vars) {
     std::set<std::string> vset;
     getVars(nd, vset);
@@ -220,14 +220,14 @@ bool calc(node *nd, std::map<std::string, bool> &vars) {
         return calc(nd->children[0], vars)&&calc(nd->children[1], vars);
     } else if (nd->content.value=="||" || nd->content.value=="+") {
         return calc(nd->children[0], vars)||calc(nd->children[1], vars);
-    } else if (nd->content.value=="->" || nd->content.value=="¡ú") {
+    } else if (nd->content.value=="->" || nd->content.value=="â†’") {
         return !calc(nd->children[0], vars)||calc(nd->children[1], vars);
     } else if (nd->content.value=="==" || nd->content.value=="<->" || nd->content.value=="?" ) {
         return calc(nd->children[0], vars)==calc(nd->children[1], vars); 
     }
 }
 
-//lambdaÊÇ³öÒ»¸ö½á¹ûºóµÄ»Øµ÷º¯Êı£¬bool²ÎÊıÊÇ¼ÆËã½á¹û£¬map´æ´¢¸÷±äÁ¿ÒÔ¼°È¡Öµ
+//lambdaæ˜¯å‡ºä¸€ä¸ªç»“æœåçš„å›è°ƒå‡½æ•°ï¼Œboolå‚æ•°æ˜¯è®¡ç®—ç»“æœï¼Œmapå­˜å‚¨å„å˜é‡ä»¥åŠå–å€¼
 void truth_table(std::map<std::string, bool>::iterator it, std::map<std::string, bool> &vars, node *nd, std::function<void(bool, std::map<std::string, bool>&)> lambda) {
     if (it!=vars.end()) {
         auto it2 = it; ++it2;
@@ -254,7 +254,7 @@ void output_truth_table(node* nd) {
 }
 
 
-//ÓÃÓÚÅĞ¶ÏbµÄ·Ç0ÏîÊÇ·ñ¿ÉÒÔ¸²¸ÇsµÄ·Ç0Ïî
+//ç”¨äºåˆ¤æ–­bçš„é0é¡¹æ˜¯å¦å¯ä»¥è¦†ç›–sçš„é0é¡¹
 bool isSub(const std::vector<char> &s, const std::vector<char> &b) {
     int len = s.size();
     for (int i=0; i<len; ++i) 
@@ -262,13 +262,13 @@ bool isSub(const std::vector<char> &s, const std::vector<char> &b) {
     return true;
 }
 
-//ÅĞ¶ÏvectorÖĞÊÇ·ñÈ«ÊÇÄ³¸öÖµ
+//åˆ¤æ–­vectorä¸­æ˜¯å¦å…¨æ˜¯æŸä¸ªå€¼
 bool isAllValue(const std::vector<char> &vs, char v) {
     for (const int it:vs) if (it!=v) return false;
     return true;
 }
 
-//±í´ïÊ½Ê÷×ªÏßĞÔÊ½
+//è¡¨è¾¾å¼æ ‘è½¬çº¿æ€§å¼
 void tree2linear(node *nd, std::stringstream &ss) {
     if (nd->children.empty()) {
         ss << nd->content.value;
@@ -282,7 +282,7 @@ void tree2linear(node *nd, std::stringstream &ss) {
         if (needBrackets) ss << ")";
     }
 }
-//±í´ïÊ½Ê÷×ªÏßĞÔÊ½
+//è¡¨è¾¾å¼æ ‘è½¬çº¿æ€§å¼
 std::string tree2linear(node *nd) {
     std::stringstream ss;
     tree2linear(nd,ss);
@@ -309,7 +309,7 @@ void linear2mathjax(node *nd, std::stringstream &ss) {
     
 }
 
-//ÏßĞÔÊ½×ªmathjax
+//çº¿æ€§å¼è½¬mathjax
 std::string linear2mathjax(const std::string exp) {
     node *nd = buildExpTree(exp);
     std::stringstream ss;
@@ -320,15 +320,15 @@ std::string linear2mathjax(const std::string exp) {
     return ss.str();
 }
 
-//¸ù¾İÑ¡ÔñµÄ×éºÏÊä³ö±í´ïÊ½
+//æ ¹æ®é€‰æ‹©çš„ç»„åˆè¾“å‡ºè¡¨è¾¾å¼
 std::string group2exp(const std::vector<std::vector<char> > &used, const std::vector<std::string> &vars) {
     std::stringstream ss;
-    if(used.empty()) //ÅĞ¶ÏÊÇ·ñÃ»ÓĞ½á¹û£¬Èç¹ûÃ»ÓĞ½á¹û¾ÍÊÇ0
+    if(used.empty()) //åˆ¤æ–­æ˜¯å¦æ²¡æœ‰ç»“æœï¼Œå¦‚æœæ²¡æœ‰ç»“æœå°±æ˜¯0
         ss << '0';
     else {
         bool firstOr = true;
         for (const auto &sels : used) {
-            if (isAllValue(sels, -1)) //ÅĞ¶ÏÊÇ·ñÊÇÓÀÕæÊ½£¬Èç¹ûÊÇ£¬Ó¦¸Ã¾ÍÖ»ÓĞÕâÒ»Ïî£¬»á×ÔÈ»ÍË³öÑ­»·
+            if (isAllValue(sels, -1)) //åˆ¤æ–­æ˜¯å¦æ˜¯æ°¸çœŸå¼ï¼Œå¦‚æœæ˜¯ï¼Œåº”è¯¥å°±åªæœ‰è¿™ä¸€é¡¹ï¼Œä¼šè‡ªç„¶é€€å‡ºå¾ªç¯
                 ss << '1';
             else {
                 int n = sels.size();
@@ -349,7 +349,7 @@ std::string group2exp(const std::vector<std::vector<char> > &used, const std::ve
     return ss.str();
 }
 
-//dÊÇµİ¹éÉî¶È£¬selnÊÇÓ¦¸ÃÑ¡Ôñ¼¸¸ö, nÊÇ×Ü±äÁ¿Êı, ndttÊÇnÎ¬ÕæÖµ±í
+//dæ˜¯é€’å½’æ·±åº¦ï¼Œselnæ˜¯åº”è¯¥é€‰æ‹©å‡ ä¸ª, næ˜¯æ€»å˜é‡æ•°, ndttæ˜¯nç»´çœŸå€¼è¡¨
 void simplify_dfs(int d, int seln, std::map<std::vector<char>, bool> &ndtt, std::vector<std::vector<char> > &used, std::vector<char> &sel) {
     if (d>=0) {
         sel[d] = -1;
@@ -368,9 +368,9 @@ void simplify_dfs(int d, int seln, std::map<std::vector<char>, bool> &ndtt, std:
         used.emplace_back(sel);
     }
 }
-//»¯¼òÂß¼­±í´ïÊ½£¬Ô­ÀíÊÇÁĞ³öÕæÖµ±íÈ»ºó½¨Á¢nÎ¬ÕæÖµ±í£¬Öğ×éºÏ±éÀúÊÇ·ñ¿ÉĞĞ£¬ºÍ¿¨ÅµÍ¼·¨ÀàËÆ
+//åŒ–ç®€é€»è¾‘è¡¨è¾¾å¼ï¼ŒåŸç†æ˜¯åˆ—å‡ºçœŸå€¼è¡¨ç„¶åå»ºç«‹nç»´çœŸå€¼è¡¨ï¼Œé€ç»„åˆéå†æ˜¯å¦å¯è¡Œï¼Œå’Œå¡è¯ºå›¾æ³•ç±»ä¼¼
 std::string simplify(node *nd) {
-    std::map<std::vector<char>, bool> ndtt;//nÎ¬ÕæÖµ±í
+    std::map<std::vector<char>, bool> ndtt;//nç»´çœŸå€¼è¡¨
     truth_table(nd, [&ndtt](bool res, std::map<std::string, bool> vars){
         std::vector<char> v;
         for (const auto &it:vars) v.push_back(it.second);
@@ -380,7 +380,7 @@ std::string simplify(node *nd) {
     getVars(nd, vars);
 
     std::vector<std::vector<char> > used;
-    std::vector<char> sel(vars.size(), -1);//sel±íÊ¾¶ÔÓ¦µÄ±äÁ¿È¡Öµ£¬0±íÊ¾false, 1±íÊ¾true, -1±íÊ¾ÎŞ¹Ø
+    std::vector<char> sel(vars.size(), -1);//selè¡¨ç¤ºå¯¹åº”çš„å˜é‡å–å€¼ï¼Œ0è¡¨ç¤ºfalse, 1è¡¨ç¤ºtrue, -1è¡¨ç¤ºæ— å…³
     for (int i=0; i<=vars.size(); ++i) 
         simplify_dfs(vars.size()-1, i, ndtt, used, sel);
 
@@ -398,7 +398,7 @@ void changeOperatorStyle(node *nd, std::map<std::string, std::string> &mp) {
         changeOperatorStyle(it,mp);
     }
 }
-//¸Ä±ä±í´ïÊ½Ê÷ÖĞµÄÔËËã·û£¬²ÎÊıÁĞ±íÖĞ{A,A2,B,B2...}±íÊ¾A±ä³ÉA2£¬B±ä³ÉB2
+//æ”¹å˜è¡¨è¾¾å¼æ ‘ä¸­çš„è¿ç®—ç¬¦ï¼Œå‚æ•°åˆ—è¡¨ä¸­{A,A2,B,B2...}è¡¨ç¤ºAå˜æˆA2ï¼ŒBå˜æˆB2
 void changeOperatorStyle(node *nd, std::initializer_list<std::string> tr) {
     std::map<std::string, std::string> mp;
     for (auto it = tr.begin(); it!=tr.end(); it+=2) {
@@ -407,7 +407,7 @@ void changeOperatorStyle(node *nd, std::initializer_list<std::string> tr) {
     changeOperatorStyle(nd, mp);
 }
 
-//°´ÕÕÖ¸¶¨µÄ¸ñÊ½×ª»»ÏßĞÔÊ½
+//æŒ‰ç…§æŒ‡å®šçš„æ ¼å¼è½¬æ¢çº¿æ€§å¼
 std::string formatLinearExp(const std::string exp, const std::string style, bool mathjax) {
     node *nd = buildExpTree(exp);
     if (style == "c") {
@@ -430,7 +430,7 @@ bool checkOption(std::string opt, cxxopts::ParseResult &res) {
 }
 
 
-//outÑ¡Ïî£ºc±íÊ¾cÓïÑÔ·ç¸ñÊä³ö£¬am±íÊ¾ÓÃ+ºÍ*Ìæ»»Êä³ö
+//outé€‰é¡¹ï¼šcè¡¨ç¤ºcè¯­è¨€é£æ ¼è¾“å‡ºï¼Œamè¡¨ç¤ºç”¨+å’Œ*æ›¿æ¢è¾“å‡º
 int main(int argc, char* argv[]) {
     cxxopts::Options options("Simple Boolean Algebra", "A simple boolean algebra system");
     options.add_options()
