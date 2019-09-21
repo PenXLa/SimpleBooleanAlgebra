@@ -273,7 +273,11 @@ void tree2linear(node *nd, std::stringstream &ss) {
     if (nd->children.empty()) {
         ss << nd->content.value;
     } else {
-        bool needBrackets = nd->parent && getOpi(nd->content.value).pri <= getOpi(nd->parent->content.value).pri;
+        bool needBrackets = nd->parent && 
+                (getOpi(nd->content.value).pri < getOpi(nd->parent->content.value).pri
+                || !getOpi(nd->content.value).lf && getOpi(nd->content.value).pri == getOpi(nd->parent->content.value).pri
+                );//意思是如果运算符是左结合，优先级相等的情况下不加括号，如果是右结合则加括号
+
         if (needBrackets) ss << "(";
         if (nd->content.value=="!") ss << "!";
         tree2linear(nd->children[0], ss);
@@ -294,7 +298,11 @@ void linear2mathjax(node *nd, std::stringstream &ss) {
     if (nd->children.empty()) {
         ss << nd->content.value;
     } else {
-        bool needBrackets = nd->parent && getOpi(nd->content.value).pri <= getOpi(nd->parent->content.value).pri;
+        bool needBrackets = nd->parent && 
+                (getOpi(nd->content.value).pri < getOpi(nd->parent->content.value).pri
+                || !getOpi(nd->content.value).lf && getOpi(nd->content.value).pri == getOpi(nd->parent->content.value).pri
+                );//意思是如果运算符是左结合，优先级相等的情况下不加括号，如果是右结合则加括号
+
         if (needBrackets) ss << "(";
         if (nd->content.value=="!") ss << "\\overline{";
         linear2mathjax(nd->children[0], ss);
