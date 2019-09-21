@@ -11,6 +11,7 @@
 
 const int UNKNOWN_OPERATOR = 1;
 const int UNKNOWN_VARIABLE = 2;
+const int MISSING_OPERAND = 3;
 
 struct ele {
     std::string value;
@@ -20,6 +21,7 @@ struct ele {
 struct node {
     ele content;
     std::vector<node*> children;
+    node *parent=nullptr;
 };
 
 //用于解析中缀表达式时提供运算符的信息
@@ -28,10 +30,11 @@ struct operator_info {
     std::string val;
     int ary, pri;//运算符元数 和 优先级（越大越优先）
     bool lf=1;//是否是左结合
+    const std::string mj="";//mathjax里一些运算符需要转义符号
 };
 
 const operator_info opis[] = { // Ary Pri
-                            {"||",2,70}, {"&&",2,90}, {"!",1,100,false}, {"^",2,80}, {"||",2,70}, 
+                            {"||",2,70}, {"&&",2,90,true,"\\&\\&"}, {"!",1,100,false}, {"^",2,80}, {"||",2,70}, 
                             {"(",0,1000}, {")",0,1000}, {"->",2,60}, {"→",2,60}, {"?",2,50},
                             {"<->",2,50}, {"==",2,50}, {"+",2,70}, {"*",2,90}
                             };
@@ -59,10 +62,11 @@ std::stringstream& operator >> (std::stringstream& in, ele& x) {
         while(c=in.peek(), ~c&&isalnum(c))
             x.value.push_back(in.get());
     } else {
+        while(~(c = in.peek()) && c==' ') in.get();//吃掉前面空格
         std::string tmp = "";
         bool isok = false;
         int cnt = 0;//表示读取的多余字符数，之后要unget回去
-        while(~(c = in.get())) {
+        while(~(c = in.get()) && c!=' ') {
             tmp.push_back(c);++cnt;
             try{
                 getOpi(tmp);
@@ -104,7 +108,9 @@ void popOper(std::stack<ele> &ostk, std::stack<node*> &nstk) {
     int ary = getOpi(nd->content.value).ary;
     nd->children.resize(ary);
     for (int i=1; i<=ary; ++i) {
+        if (nstk.empty()) throw MISSING_OPERAND;
         nd->children[ary-i] = nstk.top();
+        nstk.top()->parent = nd;
         nstk.pop();
     }
     nstk.emplace(nd);
@@ -119,6 +125,7 @@ node* buildExpTree(const std::string &exp) {
     std::stack<ele> ostk;
     std::stack<node*> nstk;
     while(1) {
+        //*******↓下一个变量或运算符*****
         try{
             if (!(ss>>e)) break;
         } catch(int col) {
@@ -140,21 +147,33 @@ node* buildExpTree(const std::string &exp) {
             }
             throw UNKNOWN_OPERATOR;
         }
-        
-        if (e.isVar) nstk.push(new node{e});
-        else if (e.value==")") {
-            while(!ostk.empty() && ostk.top().value!="(") popOper(ostk, nstk);
-            if (!ostk.empty()) ostk.pop();
-        } else {
-            while(!ostk.empty() && ostk.top().value!="(" && 
-                            //下面两个条件的意思是，对于左结合运算符，出栈 优先级>=自己的，对于右结合运算符，出栈 优先级>自己的
-                            (getOpi(ostk.top().value).pri>getOpi(e.value).pri || 
-                            getOpi(e.value).lf&&getOpi(ostk.top().value).pri==getOpi(e.value).pri))
-                popOper(ostk, nstk);
-            ostk.push(e);
+        //********↑获取下一个变量或运算符**********
+        //********↓栈操作*******************
+        try {
+            if (e.isVar) nstk.push(new node{e});
+            else if (e.value==")") {
+                while(!ostk.empty() && ostk.top().value!="(") popOper(ostk, nstk);
+                if (!ostk.empty()) ostk.pop();
+            } else {
+                while(!ostk.empty() && ostk.top().value!="(" && 
+                                //下面两个条件的意思是，对于左结合运算符，出栈 优先级>=自己的，对于右结合运算符，出栈 优先级>自己的
+                                (getOpi(ostk.top().value).pri>getOpi(e.value).pri || 
+                                getOpi(e.value).lf&&getOpi(ostk.top().value).pri==getOpi(e.value).pri))
+                    popOper(ostk, nstk);
+                ostk.push(e);
+            }
+        } catch (int err) {
+            if (err == MISSING_OPERAND) std::cout << "Missing operand";
+            while(!nstk.empty()) {
+                deleteExpTree(nstk.top());
+                nstk.pop();
+            }
+            throw MISSING_OPERAND;
         }
+        
     }
     while(!ostk.empty()) popOper(ostk, nstk);
+    //********↑栈操作*******************
     return nstk.top();
 }
 
@@ -249,6 +268,87 @@ bool isAllValue(const std::vector<char> &vs, char v) {
     return true;
 }
 
+//表达式树转线性式
+void tree2linear(node *nd, std::stringstream &ss) {
+    if (nd->children.empty()) {
+        ss << nd->content.value;
+    } else {
+        bool needBrackets = nd->parent && getOpi(nd->content.value).pri <= getOpi(nd->parent->content.value).pri;
+        if (needBrackets) ss << "(";
+        if (nd->content.value=="!") ss << "!";
+        tree2linear(nd->children[0], ss);
+        if (nd->content.value!="!") ss << nd->content.value;
+        for (int i=1; i<nd->children.size(); ++i) tree2linear(nd->children[i], ss);
+        if (needBrackets) ss << ")";
+    }
+}
+//表达式树转线性式
+std::string tree2linear(node *nd) {
+    std::stringstream ss;
+    tree2linear(nd,ss);
+    return ss.str();
+}
+
+
+void linear2mathjax(node *nd, std::stringstream &ss) {
+    if (nd->children.empty()) {
+        ss << nd->content.value;
+    } else {
+        bool needBrackets = nd->parent && getOpi(nd->content.value).pri <= getOpi(nd->parent->content.value).pri;
+        if (needBrackets) ss << "(";
+        if (nd->content.value=="!") ss << "\\overline{";
+        linear2mathjax(nd->children[0], ss);
+        if (nd->content.value=="!") {
+            ss << "}";
+        } else {
+            ss << (getOpi(nd->content.value).mj==""?nd->content.value:getOpi(nd->content.value).mj);
+        }
+        for (int i=1; i<nd->children.size(); ++i) linear2mathjax(nd->children[i], ss);
+        if (needBrackets) ss << ")";
+    }
+    
+}
+
+//线性式转mathjax
+std::string linear2mathjax(const std::string exp) {
+    node *nd = buildExpTree(exp);
+    std::stringstream ss;
+    ss<<"$$";
+    linear2mathjax(nd,ss);
+    deleteExpTree(nd);
+    ss<<"$$";
+    return ss.str();
+}
+
+//根据选择的组合输出表达式
+std::string group2exp(const std::vector<std::vector<char> > &used, const std::vector<std::string> &vars) {
+    std::stringstream ss;
+    if(used.empty()) //判断是否没有结果，如果没有结果就是0
+        ss << '0';
+    else {
+        bool firstOr = true;
+        for (const auto &sels : used) {
+            if (isAllValue(sels, -1)) //判断是否是永真式，如果是，应该就只有这一项，会自然退出循环
+                ss << '1';
+            else {
+                int n = sels.size();
+                if (!firstOr) ss << "||"; firstOr = false;
+
+                bool firstAnd = true;
+                for (int i=0; i<n; ++i) {
+                    if (sels[i]!=-1) {
+                        if (!firstAnd) ss << "&&"; firstAnd = false;
+                        if (!sels[i]) ss << "!";
+                        ss << vars[i];
+                    }
+                }
+            }
+        }
+    }
+    
+    return ss.str();
+}
+
 //d是递归深度，seln是应该选择几个, n是总变量数, ndtt是n维真值表
 void simplify_dfs(int d, int seln, std::map<std::vector<char>, bool> &ndtt, std::vector<std::vector<char> > &used, std::vector<char> &sel) {
     if (d>=0) {
@@ -285,33 +385,41 @@ std::string simplify(node *nd) {
         simplify_dfs(vars.size()-1, i, ndtt, used, sel);
 
     //************************************
-    std::stringstream ss;
-    if(used.empty()) //判断是否没有结果，如果没有结果就是0
-        ss << '0';
-    else {
-        bool firstOr = true;
-        for (const auto &sels : used) {
-            if (isAllValue(sels, -1)) //判断是否是永真式，如果是，应该就只有这一项，会自然退出循环
-                ss << '1';
-            else {
-                int n = sels.size();
-                if (!firstOr) ss << "||"; firstOr = false;
-
-                bool firstAnd = true;
-                for (int i=0; i<n; ++i) {
-                    if (sels[i]!=-1) {
-                        if (!firstAnd) ss << "&&"; firstAnd = false;
-                        if (!sels[i]) ss << "!";
-                        ss << vars[i];
-                    }
-                }
-            }
-        }
-    }
-    
-    return ss.str();
+    return group2exp(used, vars);
 }
 
+
+
+void changeOperatorStyle(node *nd, std::map<std::string, std::string> &mp) {
+    if (!nd->content.isVar && mp.count(nd->content.value)) {
+        nd->content.value = mp[nd->content.value];
+    }
+    for (auto it : nd->children) {
+        changeOperatorStyle(it,mp);
+    }
+}
+//改变表达式树中的运算符，参数列表中{A,A2,B,B2...}表示A变成A2，B变成B2
+void changeOperatorStyle(node *nd, std::initializer_list<std::string> tr) {
+    std::map<std::string, std::string> mp;
+    for (auto it = tr.begin(); it!=tr.end(); it+=2) {
+        mp[*it] = *(it+1);
+    }
+    changeOperatorStyle(nd, mp);
+}
+
+//按照指定的格式转换线性式
+std::string formatLinearExp(const std::string exp, const std::string style, bool mathjax) {
+    node *nd = buildExpTree(exp);
+    if (style == "c") {
+        changeOperatorStyle(nd, {"+","||","*","&&"});
+    } else if (style == "am") {
+        changeOperatorStyle(nd, {"||","+","&&","*"});
+    }
+    std::string ans = tree2linear(nd);
+    if (mathjax) ans = linear2mathjax(ans);
+    deleteExpTree(nd);
+    return ans;
+}
 
 bool checkOption(std::string opt, cxxopts::ParseResult &res) {
     if (res.count(opt)) return true;
@@ -322,30 +430,33 @@ bool checkOption(std::string opt, cxxopts::ParseResult &res) {
 }
 
 
-
+//out选项：c表示c语言风格输出，am表示用+和*替换输出
 int main(int argc, char* argv[]) {
     cxxopts::Options options("Simple Boolean Algebra", "A simple boolean algebra system");
     options.add_options()
-    ("g,get", "tell me what you want", cxxopts::value<std::string>())
-    ("e,exp", "input the expression", cxxopts::value<std::string>());
+    ("e,exp", "input the expression", cxxopts::value<std::string>())
+    ("f,function", "tell me what you want", cxxopts::value<std::string>()->default_value("null"))
+    ("o,out", "output style", cxxopts::value<std::string>()->default_value("c"))
+    ("m,mathjax", "use mathjax format to output");
+    options.parse_positional({"exp", "function", "out"});
 
     try {
         auto res = options.parse(argc,argv);
-        checkOption("get", res);
-        std::string oper = res["get"].as<std::string>();
+        std::string oper = res["function"].as<std::string>();
         if (oper == "simplify" || oper == "s") {
             checkOption("exp", res);
             std::string exp = res["exp"].as<std::string>();
 
             try {
                 node *nd = buildExpTree(exp);
-                std::cout << simplify(nd);
+                std::string sim = simplify(nd);
                 deleteExpTree(nd);
+                std:: cout << formatLinearExp(sim, res["out"].as<std::string>(), res["mathjax"].as<bool>());
                 return 0;
             } catch(...) {
                 exit(-1);
             }
-        } else if (oper == "postexp") {
+        } else if (oper == "postexp" || oper == "pe") {
             checkOption("exp", res);
             std::string exp = res["exp"].as<std::string>();
 
@@ -357,14 +468,32 @@ int main(int argc, char* argv[]) {
             } catch(...) {
                 exit(-1);
             }
+        } else if (oper == "table" || oper == "t") {
+            checkOption("exp", res);
+            std::string exp = res["exp"].as<std::string>();
+
+            try {
+                node *nd = buildExpTree(exp);
+                output_truth_table(nd);
+                deleteExpTree(nd);
+                return 0;
+            } catch(...) {
+                exit(-1);
+            }
+        } else if (oper == "null") {
+            checkOption("exp", res);
+            std::string exp = res["exp"].as<std::string>();
+
+            try {
+                std::cout << formatLinearExp(exp, res["out"].as<std::string>(), res["mathjax"].as<bool>());
+                return 0;
+            } catch(...) {
+                exit(-1);
+            }
         }
 
     } catch (cxxopts::OptionParseException e) {
         std::cout << "unknown option";
         exit(-1);
     }
-    
-    
-
-    
 }
