@@ -490,6 +490,19 @@ int main(int argc, char* argv[]) {
             } catch(...) {
                 exit(-1);
             }
+        } else if (oper == "varn") {
+            checkOption("exp", res);
+            std::string exp = res["exp"].as<std::string>();
+
+            try {
+                node *nd = buildExpTree(exp);
+                std::vector<std::string> vs;
+                getVars(nd, vs);
+                std::cout << vs.size();
+                return 0;
+            } catch(...) {
+                exit(-1);
+            }
         }
 
     } catch (cxxopts::OptionParseException e) {
