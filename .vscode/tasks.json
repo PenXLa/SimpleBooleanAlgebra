@@ -3,11 +3,12 @@
     "tasks": [
         {
             "type": "shell",
-            "label": "g++.exe build active file",
+            "label": "g++",
             "command": "D:\\ProgramFiles_Eng\\mingw64\\bin\\g++.exe",
             "args": [
                 "-g",
-                "${file}",
+                "${fileDirname}\\main.cpp",
+                "${fileDirname}\\utils.cpp",
                 "-o",
                 "${fileDirname}\\${fileBasenameNoExtension}.exe"
             ],

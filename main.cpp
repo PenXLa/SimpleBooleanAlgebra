@@ -8,14 +8,13 @@
 #include<set>
 #include<cstring>
 #include"cxxopts.hpp"
-
-const int UNKNOWN_OPERATOR = 1;
-const int UNKNOWN_VARIABLE = 2;
-const int MISSING_OPERAND = 3;
+#include"exceptions.hpp"
+#include"utils.hpp"
 
 struct ele {
     std::string value;
     bool isVar;
+    int pos;//在线性式中的位置，方便定位错误
 };
 
 struct node {
@@ -32,6 +31,8 @@ struct operator_info {
     bool lf=1;//是否是左结合
     const std::string mj="";//mathjax里一些运算符需要转义符号
 };
+
+
 
 const operator_info opis[] = { // Ary Pri
                             {"||",2,70}, {"&&",2,90,true,"\\&\\&"}, {"!",1,100,false}, {"^",2,80}, 
@@ -52,11 +53,12 @@ operator_info getOpi(std::string s) {
     throw presame;
 }
 
-//如果识别出错，throw列号
+
 std::stringstream& operator >> (std::stringstream& in, ele& x) {
     if (in.peek()==-1) return in;
     x.isVar = isalnum(in.peek());
     x.value.clear();
+    x.pos = in.tellg()+1;
     char c;
     if (x.isVar) {
         while(c=in.peek(), ~c&&isalnum(c))
@@ -66,7 +68,8 @@ std::stringstream& operator >> (std::stringstream& in, ele& x) {
         std::string tmp = "";
         bool isok = false;
         int cnt = 0;//表示读取的多余字符数，之后要unget回去
-        while(~(c = in.get()) && c!=' ') {
+        while(~(c = in.peek()) && c!=' ') {
+            in.get();
             tmp.push_back(c);++cnt;
             try{
                 getOpi(tmp);
@@ -79,7 +82,7 @@ std::stringstream& operator >> (std::stringstream& in, ele& x) {
         }
         for (;cnt>0; --cnt) in.unget();
 
-        if (!isok) throw (int)(in.tellg()+1);
+        if (!isok) throw unknown_operator(in.tellg()==-1?in.str().length():(int)in.tellg()+1);
     }
     return in;
 }
@@ -108,7 +111,7 @@ void popOper(std::stack<ele> &ostk, std::stack<node*> &nstk) {
     int ary = getOpi(nd->content.value).ary;
     nd->children.resize(ary);
     for (int i=1; i<=ary; ++i) {
-        if (nstk.empty()) throw MISSING_OPERAND;
+        if (nstk.empty()) throw missing_operand(nd->content.value, nd->content.pos);
         nd->children[ary-i] = nstk.top();
         nstk.top()->parent = nd;
         nstk.pop();
@@ -124,32 +127,30 @@ node* buildExpTree(const std::string &exp) {
     ele e;
     std::stack<ele> ostk;
     std::stack<node*> nstk;
-    while(1) {
-        //*******↓下一个变量或运算符*****
-        try{
-            if (!(ss>>e)) break;
-        } catch(int col) {
-            if (col == 0) {
-                 puts("wrong expression.");
-            } else {
-                std::stringstream err;
-                err << "unknown operator on col " << col << '.';
-                std::cout << err.str() <<'\n';
-                std::cout << exp << '\n';
-                for (int i=0; i<col-1; ++i) putchar(' ');
-                puts("^");
-            }
-            
+    try {
+        while(1) {
+            //*******↓下一个变量或运算符*****
+            try{
+                if (!(ss>>e)) break;
+            } catch(unknown_operator e) {
+                if (e.pos == 0) {
+                    puts("wrong expression.");
+                } else {
+                    std::stringstream err;
+                    err << "unknown operator on col " << e.pos << '.';
+                    std::cout << err.str() <<'\n';
+                    print_error_col(exp, e.pos);
+                }
+                
 
-            while(!nstk.empty()) {
-                deleteExpTree(nstk.top());
-                nstk.pop();
+                while(!nstk.empty()) {
+                    deleteExpTree(nstk.top());
+                    nstk.pop();
+                }
+                throw e;
             }
-            throw UNKNOWN_OPERATOR;
-        }
-        //********↑获取下一个变量或运算符**********
-        //********↓栈操作*******************
-        try {
+            //********↑获取下一个变量或运算符**********
+            //********↓栈操作*******************
             if (e.isVar) nstk.push(new node{e});
             else if (e.value==")") {
                 while(!ostk.empty() && ostk.top().value!="(") popOper(ostk, nstk);
@@ -162,17 +163,17 @@ node* buildExpTree(const std::string &exp) {
                     popOper(ostk, nstk);
                 ostk.push(e);
             }
-        } catch (int err) {
-            if (err == MISSING_OPERAND) std::cout << "Missing operand";
-            while(!nstk.empty()) {
-                deleteExpTree(nstk.top());
-                nstk.pop();
-            }
-            throw MISSING_OPERAND;
         }
-        
+        while(!ostk.empty()) popOper(ostk, nstk);
+    } catch (missing_operand mo) {
+        std::cout << "Missing operand of '" << mo.op << "', " << getOpi(mo.op).ary << " operand(s) expected.\n";
+        print_error_col(exp, mo.pos);
+        while(!nstk.empty()) {
+            deleteExpTree(nstk.top());
+            nstk.pop();
+        }
+        throw mo;
     }
-    while(!ostk.empty()) popOper(ostk, nstk);
     //********↑栈操作*******************
     return nstk.top();
 }
@@ -190,7 +191,7 @@ std::map<std::string, bool> cons = {{"1", true}, {"0", false}, {"true", true}, {
 inline bool readVar(std::string s, std::map<std::string, bool> &vars) {
     if (cons.count(s)) return cons[s];
     else if (vars.count(s)) return vars[s];
-    throw UNKNOWN_VARIABLE;
+    throw unknown_varible();
 }
 //遍历表达式树，将遇到的变量作为key加入到map中
 void getVars(node *nd, std::map<std::string, bool> &vars) {
