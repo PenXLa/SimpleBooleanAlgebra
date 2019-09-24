@@ -6,7 +6,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${fileDirname}\\main.exe",
-            "args": [],
+            "args": ["--exp=A!+B"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

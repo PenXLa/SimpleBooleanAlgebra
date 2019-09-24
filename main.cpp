@@ -43,8 +43,8 @@ const operator_info opis[] = { // Ary Pri
                             {"(",0,1000}, {")",0,1000}, 
                             {"->",2,60}, {"→",2,60}, 
                             {"!->",2,60}, {"!→",2,60},
-                            {"⇄",2,50},{"<->",2,50}, {"==",2,50},
-                            {"!⇄",2,50},{"!<->",2,50}, {"!=",2,50}, {"^",2,80}, 
+                            /*{"⇄",2,50},*/{"<->",2,50}, {"==",2,50},
+                            /*{"!⇄",2,50},*/{"!<->",2,50}, {"!=",2,50}, {"^",2,80}, 
                             };
 
 
@@ -74,20 +74,18 @@ std::stringstream& operator >> (std::stringstream& in, ele& x) {
     } else {
         std::string tmp = "";
         bool isok = false;
-        int cnt = 0;//表示读取的多余字符数，之后要unget回去
         while(~(c = in.peek()) && c!=' ') {
             in.get();
-            tmp.push_back(c);++cnt;
+            tmp.push_back(c);
             try{
                 getOpi(tmp);
                 x.value = tmp;
                 isok=true;
-                cnt -= tmp.length();
             } catch(int presame){
                 if (!presame) break;
             }
         }
-        for (;cnt>0; --cnt) in.unget();//将多余的字符unget回去
+        for (int tn = tmp.length(), on = x.value.length(); tn>on; --tn) in.unget();//将多余的字符unget回去
 
         if (!isok) throw unknown_operator(tmp, in.tellg()==-1?in.str().length():(int)in.tellg()+1);
     }
@@ -222,7 +220,7 @@ bool calc(node *nd, std::map<std::string, bool> &vars) {
     if (nd->content.isVar) return readVar(nd->content.value, vars);
     if (nd->content.value=="!") {
         return !calc(nd->children[0], vars);
-    } else if (nd->content.value=="^" || nd->content.value=="!⇄" || nd->content.value=="!<->" || nd->content.value=="!=") {
+    } else if (nd->content.value=="^" || /*nd->content.value=="!⇄" ||*/ nd->content.value=="!<->" || nd->content.value=="!=") {
         return calc(nd->children[0], vars)^calc(nd->children[1], vars);
     } else if (nd->content.value=="&&" || nd->content.value=="*") {
         return calc(nd->children[0], vars)&&calc(nd->children[1], vars);

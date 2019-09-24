@@ -10,8 +10,7 @@
                 "${fileDirname}\\main.cpp",
                 "${fileDirname}\\utils.cpp",
                 "-o",
-                "${fileDirname}\\${fileBasenameNoExtension}.exe",
-                "-finput-charset=UTF-8"
+                "${fileDirname}\\${fileBasenameNoExtension}.exe"
             ],
             "options": {
                 "cwd": "D:\\ProgramFiles_Eng\\mingw64\\bin"
