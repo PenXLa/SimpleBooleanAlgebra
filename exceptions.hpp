@@ -10,7 +10,8 @@ struct missing_operand : public std::exception {
 };
 struct unknown_operator : public std::exception {
     int pos;
-    unknown_operator(int pos):pos(pos){}
+    std::string op;
+    unknown_operator(const std::string &op, int pos):pos(pos),op(op){}
     const char * what () const throw () {
         return "unknown operator";
     }

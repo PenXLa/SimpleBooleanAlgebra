@@ -35,9 +35,16 @@ struct operator_info {
 
 
 const operator_info opis[] = { // Ary Pri
-                            {"||",2,70}, {"&&",2,90,true,"\\&\\&"}, {"!",1,100,false}, {"^",2,80}, 
-                            {"(",0,1000}, {")",0,1000}, {"->",2,60}, {"→",2,60}, {"⇄",2,50},
-                            {"<->",2,50}, {"==",2,50}, {"+",2,70}, {"*",2,90}
+                            {"||",2,70}, {"+",2,70},
+                            {"!||",2,70}, {"!+",2,70},{"↓",2,70},
+                            {"&&",2,90,true,"\\&\\&"}, {"*",2,90},
+                            {"↑", 2, 90}, {"!&&", 2, 90}, {"!*", 2, 90},
+                            {"!",1,100,false}, 
+                            {"(",0,1000}, {")",0,1000}, 
+                            {"->",2,60}, {"→",2,60}, 
+                            {"!->",2,60}, {"!→",2,60},
+                            {"⇄",2,50},{"<->",2,50}, {"==",2,50},
+                            {"!⇄",2,50},{"!<->",2,50}, {"!=",2,50}, {"^",2,80}, 
                             };
 
 
@@ -55,16 +62,16 @@ operator_info getOpi(std::string s) {
 
 
 std::stringstream& operator >> (std::stringstream& in, ele& x) {
+    char c;
+    while(~(c = in.peek()) && c==' ') in.get();//吃掉前面空格
     if (in.peek()==-1) return in;
     x.isVar = isalnum(in.peek());
     x.value.clear();
     x.pos = in.tellg()+1;
-    char c;
     if (x.isVar) {
         while(c=in.peek(), ~c&&isalnum(c))
             x.value.push_back(in.get());
     } else {
-        while(~(c = in.peek()) && c==' ') in.get();//吃掉前面空格
         std::string tmp = "";
         bool isok = false;
         int cnt = 0;//表示读取的多余字符数，之后要unget回去
@@ -80,9 +87,9 @@ std::stringstream& operator >> (std::stringstream& in, ele& x) {
                 if (!presame) break;
             }
         }
-        for (;cnt>0; --cnt) in.unget();
+        for (;cnt>0; --cnt) in.unget();//将多余的字符unget回去
 
-        if (!isok) throw unknown_operator(in.tellg()==-1?in.str().length():(int)in.tellg()+1);
+        if (!isok) throw unknown_operator(tmp, in.tellg()==-1?in.str().length():(int)in.tellg()+1);
     }
     return in;
 }
@@ -137,7 +144,7 @@ node* buildExpTree(const std::string &exp) {
                     puts("wrong expression.");
                 } else {
                     std::stringstream err;
-                    err << "unknown operator on col " << e.pos << '.';
+                    err << "unknown operator '" << e.op << "' on col " << e.pos << '.';
                     std::cout << err.str() <<'\n';
                     print_error_col(exp, e.pos);
                 }
@@ -166,7 +173,7 @@ node* buildExpTree(const std::string &exp) {
         }
         while(!ostk.empty()) popOper(ostk, nstk);
     } catch (missing_operand mo) {
-        std::cout << "Missing operand of '" << mo.op << "', " << getOpi(mo.op).ary << " operand(s) expected.\n";
+        std::cout << "Missing operand of '" << mo.op << "' on col " << mo.pos << ", " << getOpi(mo.op).ary << " operand(s) expected.\n";
         print_error_col(exp, mo.pos);
         while(!nstk.empty()) {
             deleteExpTree(nstk.top());
@@ -215,7 +222,7 @@ bool calc(node *nd, std::map<std::string, bool> &vars) {
     if (nd->content.isVar) return readVar(nd->content.value, vars);
     if (nd->content.value=="!") {
         return !calc(nd->children[0], vars);
-    } else if (nd->content.value=="^") {
+    } else if (nd->content.value=="^" || nd->content.value=="!⇄" || nd->content.value=="!<->" || nd->content.value=="!=") {
         return calc(nd->children[0], vars)^calc(nd->children[1], vars);
     } else if (nd->content.value=="&&" || nd->content.value=="*") {
         return calc(nd->children[0], vars)&&calc(nd->children[1], vars);
@@ -223,8 +230,14 @@ bool calc(node *nd, std::map<std::string, bool> &vars) {
         return calc(nd->children[0], vars)||calc(nd->children[1], vars);
     } else if (nd->content.value=="->" || nd->content.value=="→") {
         return !calc(nd->children[0], vars)||calc(nd->children[1], vars);
-    } else if (nd->content.value=="==" || nd->content.value=="<->" || nd->content.value=="?" ) {
+    } else if (nd->content.value=="==" || nd->content.value=="<->" /*|| nd->content.value=="⇄"*/ ) {
         return calc(nd->children[0], vars)==calc(nd->children[1], vars); 
+    } else if (nd->content.value=="↓" || nd->content.value=="!||" || nd->content.value=="!+") {
+        return !(calc(nd->children[0], vars)||calc(nd->children[1], vars));
+    } else if (nd->content.value=="↑" || nd->content.value=="!&&" || nd->content.value=="!*") {
+        return !(calc(nd->children[0], vars)&&calc(nd->children[1], vars));
+    } else if (nd->content.value=="!->" || nd->content.value=="!→") {
+        return !(!calc(nd->children[0], vars)||calc(nd->children[1], vars));
     }
 }
 
