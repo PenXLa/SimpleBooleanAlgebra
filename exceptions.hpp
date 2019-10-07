@@ -23,4 +23,8 @@ struct unknown_varible : public std::exception {
     }
 };
 
-
+struct wrong_expression : public std::exception {
+    const char * what () const throw () {
+        return "wrong expression";
+    }
+};

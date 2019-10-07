@@ -180,6 +180,7 @@ node* buildExpTree(const std::string &exp) {
         throw mo;
     }
     //********↑栈操作*******************
+    if (nstk.empty()) throw wrong_expression();
     return nstk.top();
 }
 
