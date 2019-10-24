@@ -125,6 +125,14 @@ void popOper(std::stack<ele> &ostk, std::stack<node*> &nstk) {
 }
 
 
+//解析过程中出现错误，释放内存
+void giveupMem(std::stack<node*> &nstk) {
+    while(!nstk.empty()) {
+        deleteExpTree(nstk.top());
+        nstk.pop();
+    }
+}
+
 
 node* buildExpTree(const std::string &exp) {
     std::stringstream ss;
@@ -138,28 +146,18 @@ node* buildExpTree(const std::string &exp) {
             try{
                 if (!(ss>>e)) break;
             } catch(unknown_operator e) {
-                if (e.pos == 0) {
-                    puts("wrong expression.");
-                } else {
-                    std::stringstream err;
-                    err << "unknown operator '" << e.op << "' on col " << e.pos << '.';
-                    std::cout << err.str() <<'\n';
-                    print_error_col(exp, e.pos);
-                }
-                
-
-                while(!nstk.empty()) {
-                    deleteExpTree(nstk.top());
-                    nstk.pop();
-                }
+                giveupMem(nstk);
                 throw e;
             }
             //********↑获取下一个变量或运算符**********
             //********↓栈操作*******************
             if (e.isVar) nstk.push(new node{e});
             else if (e.value==")") {
-                while(!ostk.empty() && ostk.top().value!="(") popOper(ostk, nstk);
-                if (!ostk.empty()) ostk.pop();
+                while(1) {
+                    if (ostk.empty()) giveupMem(nstk), throw missing_operator();//没有遇到左括号，错误
+                    if (ostk.top().value=="(") {ostk.pop(); break;}//遇到了左括号，退出
+                    popOper(ostk, nstk);
+                }
             } else {
                 while(!ostk.empty() && ostk.top().value!="(" && 
                                 //下面两个条件的意思是，对于左结合运算符，出栈 优先级>=自己的，对于右结合运算符，出栈 优先级>自己的
@@ -171,16 +169,11 @@ node* buildExpTree(const std::string &exp) {
         }
         while(!ostk.empty()) popOper(ostk, nstk);
     } catch (missing_operand mo) {
-        std::cout << "Missing operand of '" << mo.op << "' on col " << mo.pos << ", " << getOpi(mo.op).ary << " operand(s) expected.\n";
-        print_error_col(exp, mo.pos);
-        while(!nstk.empty()) {
-            deleteExpTree(nstk.top());
-            nstk.pop();
-        }
+        giveupMem(nstk);
         throw mo;
     }
     //********↑栈操作*******************
-    if (nstk.empty()) throw wrong_expression();
+    if (nstk.empty() || nstk.size()>1) giveupMem(nstk), throw missing_operator();
     return nstk.top();
 }
 
@@ -461,72 +454,71 @@ int main(int argc, char* argv[]) {
     ("m,mathjax", "use mathjax format to output");
     options.parse_positional({"exp", "function", "out"});
 
+    std::string exp;
     try {
         auto res = options.parse(argc,argv);
         std::string oper = res["function"].as<std::string>();
         if (oper == "simplify" || oper == "s") {
             checkOption("exp", res);
-            std::string exp = res["exp"].as<std::string>();
+            exp = res["exp"].as<std::string>();
 
-            try {
-                node *nd = buildExpTree(exp);
-                std::string sim = simplify(nd);
-                deleteExpTree(nd);
-                std:: cout << formatLinearExp(sim, res["out"].as<std::string>(), res["mathjax"].as<bool>());
-                return 0;
-            } catch(...) {
-                exit(-1);
-            }
+            node *nd = buildExpTree(exp);
+            std::string sim = simplify(nd);
+            deleteExpTree(nd);
+            std:: cout << formatLinearExp(sim, res["out"].as<std::string>(), res["mathjax"].as<bool>());
+            return 0;
         } else if (oper == "postexp" || oper == "pe") {
             checkOption("exp", res);
-            std::string exp = res["exp"].as<std::string>();
+            exp = res["exp"].as<std::string>();
 
-            try {
-                node *nd = buildExpTree(exp);
-                post_out(nd);
-                deleteExpTree(nd);
-                return 0;
-            } catch(...) {
-                exit(-1);
-            }
+            node *nd = buildExpTree(exp);
+            post_out(nd);
+            deleteExpTree(nd);
+            return 0;
         } else if (oper == "table" || oper == "t") {
             checkOption("exp", res);
-            std::string exp = res["exp"].as<std::string>();
+            exp = res["exp"].as<std::string>();
 
-            try {
-                node *nd = buildExpTree(exp);
-                output_truth_table(nd);
-                deleteExpTree(nd);
-                return 0;
-            } catch(...) {
-                exit(-1);
-            }
+            node *nd = buildExpTree(exp);
+            output_truth_table(nd);
+            deleteExpTree(nd);
+            return 0;
         } else if (oper == "null") {
             checkOption("exp", res);
-            std::string exp = res["exp"].as<std::string>();
+            exp = res["exp"].as<std::string>();
 
-            try {
-                std::cout << formatLinearExp(exp, res["out"].as<std::string>(), res["mathjax"].as<bool>());
-                return 0;
-            } catch(...) {
-                exit(-1);
-            }
+            std::cout << formatLinearExp(exp, res["out"].as<std::string>(), res["mathjax"].as<bool>());
+            return 0;
         } else if (oper == "varn") {
             checkOption("exp", res);
-            std::string exp = res["exp"].as<std::string>();
+            exp = res["exp"].as<std::string>();
 
-            try {
-                node *nd = buildExpTree(exp);
-                std::vector<std::string> vs;
-                getVars(nd, vs);
-                std::cout << vs.size();
-                return 0;
-            } catch(...) {
-                exit(-1);
-            }
+            node *nd = buildExpTree(exp);
+            std::vector<std::string> vs;
+            getVars(nd, vs);
+            std::cout << vs.size();
+            return 0;
         }
 
-    } catch (cxxopts::OptionParseException e) {
+    } catch (missing_operator) {
+        std::cout << "missing operator.";
+        exit(-1);
+    } catch (missing_operand mo) {
+        std::cout << "Missing operand of '" << mo.op << "' on col " << mo.pos << ", " << getOpi(mo.op).ary << " operand(s) expected.\n";
+        print_error_col(exp, mo.pos);
+        exit(-1);
+    } catch (unknown_operator e) {
+        if (e.pos == 0) {
+            puts("wrong expression.");
+        } else {
+            std::stringstream err;
+            err << "unknown operator '" << e.op << "' on col " << e.pos << '.';
+            std::cout << err.str() <<'\n';
+            print_error_col(exp, e.pos);
+        }
+        exit(-1);
+    }
+    catch (cxxopts::OptionParseException e) {
         std::cout << "unknown option";
         exit(-1);
     }

@@ -28,3 +28,9 @@ struct wrong_expression : public std::exception {
         return "wrong expression";
     }
 };
+
+struct missing_operator : public std::exception {
+    const char * what () const throw () {
+        return "missing operator";
+    }
+};
