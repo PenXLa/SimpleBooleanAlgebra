@@ -173,7 +173,7 @@ node* buildExpTree(const std::string &exp) {
         throw mo;
     }
     //********↑栈操作*******************
-    if (nstk.empty() || nstk.size()>1) giveupMem(nstk), throw missing_operator();
+    if (nstk.size()!=1) giveupMem(nstk), throw missing_operator();
     return nstk.top();
 }
 
